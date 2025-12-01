@@ -1,0 +1,147 @@
+import pygame
+import sys
+from collections import deque
+
+pygame.init()
+
+# setting the player class
+class Player:
+    def __init__(self, x, y, img, l, h):
+        self.x = x
+        self.y = y
+        self.img = img
+        self.l = l
+        self.h = h
+        self.img = pygame.transform.scale(img, (l,h))
+        self.rect = pygame.Rect(self.x, self.y, self.l, self.h)
+
+    def update(self):
+        self.rect = pygame.Rect(self.x, self.y, self.l, self.h)
+
+
+bullet = pygame.image.load("C:\Python\Space_invaders\Images\Bullet.png")
+
+
+class Bullet:
+    def __init__(self, x, y, l, h):
+        self.x = x
+        self.y = y
+        self.l = l
+        self.h = h
+        self.rect = pygame.Rect(self.x, self.y, self.l, self.h) 
+
+# setting the screen
+SCREEN_HEIGHT = 500
+SCREEN_WIDTH = 500
+
+screen = pygame.display.set_mode([SCREEN_HEIGHT, SCREEN_WIDTH])
+
+clock = pygame.time.Clock()
+FPS = 60
+
+
+
+player = Player((SCREEN_WIDTH/2)-(35/2), (SCREEN_HEIGHT - 100), pygame.image.load("C:\Python\Space_invaders\Images\playerShip.png"), 40, 35)
+player_Xchange = 0
+
+fired = False
+
+# Player lives system
+player_hit = False
+player_lives = 3
+
+    
+
+# Hit box
+player_hitbox = Player.rect
+bullet_hitbox = Bullet.rect
+invader_hitbox = Invader.rect
+invader_bullet_hitbox = InvaderBullet.rect
+
+
+
+# Using deque to set a cooldown for bullets
+bullets = deque()
+milli_sec_between_shots = 750
+last_shot_time = 0
+
+
+def fire_bullet():
+    global last_shot_time
+    last_shot_time = pygame.time.get_ticks()
+    new_bullet = Bullet()
+    new_bullet.x = player.x + 46
+    new_bullet.y = player.y - 10
+    bullets.append(new_bullet)
+    screen.blit(bullet, (new_bullet.x -28, new_bullet.y + 7))
+
+# game loop
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+            pygame.display.quit()
+            pygame.quit()
+            sys.exit()
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_LEFT or event.key == pygame.K_a:
+                player_Xchange = -5
+            elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
+                player_Xchange = 5
+            elif event.key == pygame.K_SPACE:
+                current_time = pygame.time.get_ticks()
+                # only allow firing if enough time passed
+                if current_time > last_shot_time + milli_sec_between_shots:
+                    fire_bullet()
+            
+
+                
+            elif event.key == pygame.K_ESCAPE == pygame.WINDOWCLOSE:
+                running = False
+
+        elif event.type == pygame.KEYUP:
+            if event.key == pygame.K_LEFT or event.key == pygame.K_a or event.key == pygame.K_RIGHT or event.key == pygame.K_d:
+                player_Xchange = 0
+    
+    player.x += player_Xchange
+
+
+
+    screen.fill([0,0,0])
+    
+    screen.blit(player.img, (player.x, player.y))
+    
+    for a_bullet in bullets:
+        a_bullet.y -= 9
+        screen.blit(bullet, (a_bullet.x - 28, a_bullet.y + 7))
+        # Check for collision
+        if bullet_hitbox.colliderect(invader_hitbox):
+            invader_health -= 1
+            if invader_health <= 0:
+                # remove invader
+            bullets.popleft()
+        
+
+    if bullets and bullets[0].y <= 0:
+        bullets.popleft()
+
+    if invader_bullet_hitbox.colliderect(player_hitbox):
+        player_hit = True
+        print("player hit!")        
+        player_lives -= 1
+        player_hit = False
+    if player_lives <= 0:
+        print("Game Over")
+    
+
+    pygame.display.flip()
+
+    clock.tick(FPS)
+
+    if player.x <= 16:
+        player.x = 16
+    elif player.x >= 450:
+        player.x = 450
+
+sys.exit(0)
