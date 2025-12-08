@@ -1,1 +1,182 @@
 
+# ------------------------- Things to do ------------------------- 
+# Speed increases as invaders die
+# Add Health to Invaders
+# Add second Wave (Move in Zig-Zag)
+# Add Boss 
+
+
+import pygame
+import sys
+from collections import deque
+import random
+
+pygame.init()
+
+# ------------------------- SCREEN SETUP -------------------------
+SCREEN_HEIGHT = 500
+SCREEN_WIDTH = 500
+
+screen = pygame.display.set_mode([SCREEN_WIDTH, SCREEN_HEIGHT])
+pygame.display.set_caption("Invader Test")
+
+clock = pygame.time.Clock()
+FPS = 60
+
+# ------------------------- ENEMY START -------------------------
+
+alien1_img = pygame.image.load(
+    r"C:/Users/Amber/Downloads/space/alien1.png"
+).convert_alpha()
+alien1 = pygame.transform.scale(alien1_img, (32, 32))
+
+class Invader:
+    def __init__(self, x, y, img, row, col, health=2):
+        self.x = x
+        self.y = y
+        self.img = img
+        self.row = row
+        self.col = col
+        self.health = health      
+        self.rect = self.img.get_rect(topleft=(self.x, self.y))
+
+    def update(self):
+        self.rect.topleft = (self.x, self.y)
+
+
+
+class InvaderBullet:
+    def __init__(self, x, y, l, h):
+        self.x = x
+        self.y = y
+        self.l = l
+        self.h = h
+        self.rect = pygame.Rect(self.x, self.y, self.l, self.h)
+
+    def update(self):
+        self.y += 5
+        self.rect.topleft = (self.x, self.y)
+
+
+# Grid
+invaders = []
+
+cols = 6
+rows = 6
+
+alien_width = alien1.get_width()
+alien_height = alien1.get_height()
+
+x_margin = 40   # distance from left edge
+y_margin = 40   # distance from top edge
+
+x_spacing = alien_width + 10   # horizontal space between sprites
+y_spacing = alien_height + 10  # vertical space between sprites
+
+for row in range(rows):
+    for col in range(cols):
+        x = x_margin + col * x_spacing
+        y = y_margin + row * y_spacing
+        invaders.append(Invader(x, y, alien1, row, col, health=2))
+
+
+
+def get_invaders_by_row(invaders, rows, cols):
+    rows_list = []
+    for r in range(rows):
+        row_start = r * cols
+        row_end = row_start + cols
+        rows_list.append(invaders[row_start:row_end])
+    return rows_list
+
+
+invader_rows = get_invaders_by_row(invaders, rows, cols)
+
+# Movement
+invader_direction = 1      # 1 = moving right, -1 = moving left
+invader_speed = 20.0
+invader_move_down = 20
+
+current_row = 0
+row_move_delay = 300     
+last_row_move_time = pygame.time.get_ticks()
+
+# Shooting
+invader_bullets = deque()
+invader_shot_cooldown = 800      
+last_invader_shot_time = 0
+
+
+# ------------------------- ENEMY END -------------------------
+
+running = True
+while running:
+    clock.tick(FPS)
+    current_time = pygame.time.get_ticks()
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    # Move Row
+    if current_time - last_row_move_time > row_move_delay and invader_rows:
+        moving_row = invader_rows[current_row]
+
+        # Move that row sideways
+        for inv in moving_row:
+            inv.x += invader_direction * invader_speed
+
+        # Check if ANY invader in that row touches the screen edge
+        hit_edge = any(
+            inv.x <= 0 or inv.x + inv.img.get_width() >= SCREEN_WIDTH
+            for inv in moving_row
+        )
+
+        if hit_edge:
+            invader_direction *= -1
+
+            for row in invader_rows:
+                for inv in row:
+                    inv.y += invader_move_down
+                    inv.x = x_margin + inv.col * x_spacing
+
+
+        current_row = (current_row + 1) % len(invader_rows)
+        last_row_move_time = current_time
+
+    # ---- random invader shooting ----
+    if invaders and current_time > last_invader_shot_time + invader_shot_cooldown:
+        if random.random() < 0.3:  # 30% to shoot
+            shooter = random.choice(invaders)
+            new_ib = InvaderBullet(
+                shooter.x + alien_width // 2 - 2,
+                shooter.y + alien_height,
+                4,
+                10
+            )
+            invader_bullets.append(new_ib)
+            last_invader_shot_time = current_time
+
+    for bullet in list(invader_bullets):
+        bullet.update()
+        if bullet.y > SCREEN_HEIGHT:
+            invader_bullets.remove(bullet)
+
+    # Draw
+    screen.fill((0, 0, 0)) 
+    
+    # Draw invaders
+    for inv in invaders:
+        inv.update()
+        screen.blit(inv.img, (inv.x, inv.y))
+
+    # Draw bullets 
+    for bullet in invader_bullets:
+        pygame.draw.rect(screen, (255, 0, 0), bullet.rect)
+
+    pygame.display.flip()
+
+# ------------------------- END -------------------------
+pygame.quit()
+sys.exit()
+
