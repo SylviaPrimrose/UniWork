@@ -15,7 +15,7 @@ screen = pygame.display.set_mode([SCREEN_HEIGHT, SCREEN_WIDTH])
 
 # tracking game time and setting frames per second
 clock = pygame.time.Clock()
-FPS = 60
+FPS = 10
 # ------------------------- SCREEN SETUP -------------------------
 
 # setting the player class, defining its x and y positions, image, the length and height,
@@ -77,13 +77,6 @@ def fire_bullet():
         5, 5                           # width, height
     )
     bullets.append(new_bullet)
-
-
-
-# Hit boxes
-player.rect = pygame.Rect(player.x, player.y, player.l, player.h)
-player_hitbox = player.rect
-
 
 # ------------------------- SCREEN SETUP -------------------------
 SCREEN_HEIGHT = 500
@@ -212,6 +205,16 @@ while running:
     # updating player position while input keys are held down
     player.x += player_Xchange
 
+    # Lock the player within the screen bounds
+    if player.x <= 16:
+        player.x = 16
+    elif player.x >= 450:
+        player.x = 450
+
+    # Sync the rect with the new x,y
+    player.update()
+
+
 
     # setting the background colour to black
     screen.fill([0,0,0])
@@ -219,8 +222,8 @@ while running:
     lives_surface = font.render(f"Lives: {player_lives}", True, (255, 255, 255))
     screen.blit(lives_surface, (10, 10))
 
-    # drawing the player onto the screen
-    screen.blit(player.img, (player.x, player.y))
+    # drawing the player using the rect
+    screen.blit(player.img, player.rect)
     # for each bullet in the bullet list, move the bullet up, and draw it to the screen
     for a_bullet in list(bullets):
         a_bullet.y -= 9
@@ -334,10 +337,5 @@ while running:
     pygame.display.flip()
 
     clock.tick(FPS)
-    # lock the player within the screen bounds
-    if player.x <= 16:
-        player.x = 16
-    elif player.x >= 450:
-        player.x = 450
 
 sys.exit(0)
