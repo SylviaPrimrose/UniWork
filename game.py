@@ -28,10 +28,10 @@ class Player:
         self.l = l
         self.h = h
         self.img = pygame.transform.scale(img, (l,h))
-        self.rect = pygame.Rect(self.x, self.y, self.l, self.h)
+        self.rect = self.img.get_rect(topleft=(self.x, self.y))
 
     def update(self):
-        self.rect = pygame.Rect(self.x, self.y, self.l, self.h)
+        self.rect.topleft = (self.x, self.y)
 # setting the player and loading the image
 player = Player((SCREEN_WIDTH/2)-(35/2), (SCREEN_HEIGHT - 100), pygame.image.load("C:/Users/Amber/Downloads/space/playerShip.png"), 40, 35)
 player_Xchange = 0
@@ -45,14 +45,16 @@ Player_last_hit_time = 0
 # The bullet class, setting its x and y positions, length and height,
 # crating a rectangle to use for a hit box
 class Bullet:
-    def __init__(self, x, y, l, h):
+    def __init__(self, x, y, img, l, h):
         self.x = x
         self.y = y
+        self.img = img
         self.l = l
         self.h = h
-        self.rect = pygame.Rect(self.x, self.y, self.l, self.h)
+        self.img = pygame.transform.scale(img, (l,h))
+        self.rect = self.img.get_rect(topleft=(self.x, self.y))
 # loading the bullet image
-bullet_img = pygame.image.load("C:/Users/Amber/Downloads/space/Bullet.png")
+bullet_img = pygame.image.load("C:/Users/Amber/Downloads/space/Bullet.png").convert_alpha()
 
 # to check if bullet is fired (used in game loop)
 fired = False
@@ -68,8 +70,14 @@ def fire_bullet():
     global last_shot_time
     last_shot_time = pygame.time.get_ticks()
 
-    new_bullet = Bullet(player.x + 20, player.y - 10, 6, 12)  # example size
+    new_bullet = Bullet(
+        player.x + player.l // 2 - 2,  # x
+        player.y - 10,                 # y
+        bullet_img,                    # img
+        5, 5                           # width, height
+    )
     bullets.append(new_bullet)
+
 
 
 # Hit boxes
@@ -86,36 +94,10 @@ pygame.display.set_caption("Invader Test")
 
 clock = pygame.time.Clock()
 FPS = 60
-
-
-# -------------- NED ------------------
-
-class Block(pygame.sprite.Sprite):
-    def __init__(self, x, y):
-        super().__init__()
-        self.image = pygame.Surface((3, 3))
-        self.image.fill((243,216,63))
-        #deternmines position of the barrier
-        self.rect = self.image.get_rect(topleft= (x.y))
-
-class Obstacle:
-    def __init__(self):
-        self.blocks_group = pygame.sprite.Group()
-        for row in range(len(grid)):
-            for col in range(len(grid[row])):
-                if grid[row][col] == 1:
-                    pos_x = x + col * 3
-                    pos_y = y + row * 3
-                    block = Block(pos_x, pos_y)
-                    self.blocks_group.add(block)
-                    
-# -------------- NED ------------------
                 
 # ------------------------- ENEMY START -------------------------
 
-alien1_img = pygame.image.load(
-    r"C:/Users/Amber/Downloads/space/alien1.png"
-).convert_alpha()
+alien1_img = pygame.image.load(r"C:/Users/Amber/Downloads/space/alien1.png").convert_alpha()
 alien1 = pygame.transform.scale(alien1_img, (32, 32))
 
 class Invader:
@@ -198,7 +180,7 @@ last_invader_shot_time = 0
 # game loop
 running = True
 while running:
-    # event handling
+    # ------------------------- EVENTS --------
     current_time = pygame.time.get_ticks()
     # closing the game window
     for event in pygame.event.get():
@@ -240,18 +222,33 @@ while running:
     # drawing the player onto the screen
     screen.blit(player.img, (player.x, player.y))
     # for each bullet in the bullet list, move the bullet up, and draw it to the screen
-    for a_bullet in bullets:
+    for a_bullet in list(bullets):
         a_bullet.y -= 9
         a_bullet.rect.topleft = (a_bullet.x, a_bullet.y)
-        screen.blit(bullet_img, a_bullet.rect)
+
+        if a_bullet.y <= 0:
+            bullets.remove(a_bullet)
+            continue
+
+        # collision with invaders
+        for inv in list(invaders):
+            if a_bullet.rect.colliderect(inv.rect):
+                inv.health -= 1
+
+                if a_bullet in bullets:
+                    bullets.remove(a_bullet)
+
+                if inv.health <= 0:
+                    invaders.remove(inv)
+                break
+
+        if a_bullet in bullets:
+            screen.blit(a_bullet.img, a_bullet.rect)
+
+
         
     
     # ------------------------- ENEMY START -------------------------
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-
     # Move Row
     if current_time - last_row_move_time > row_move_delay and invader_rows:
         moving_row = invader_rows[current_row]
@@ -306,38 +303,33 @@ while running:
 
     pygame.display.flip()
 
-# ------------------------- END -------------------------
+    # ------------------------- END -------------------------
 
-            
-    # when a bullet has gone off the screen remove it from the list
-    if bullets and bullets[0].y <= 0:
-        bullets.popleft()
-#    If the invader hits the player, lose all 3 lives
-#    if invader_hitbox.colliderect(player_hitbox):
-#        player_lives -= 3
-#     If an invader bullet hits the player, lose 1 life
-#    if invader_bullet_hitbox.colliderect(player_hitbox):
-#        if player_hit == False:
-#            player_hit = True        
-#            player_lives -= 1
-#            # reset player position
-#            player.x = (SCREEN_WIDTH/2) - (35/2)
-#            # player sprite flashing and invincibility frames
-#            # while player_hit == True:
-#            # set player sprite to 50%
-#            # set player sprite to 100%
-#            Player_last_hit_time = pygame.time.get_ticks()
-#            if current_time > Player_last_hit_time + player_i_frames:
-#                player_hit = False
-        
+    for inv in list(invaders):
+        if inv.rect.colliderect(player.rect):
+            player_lives -= 3
 
-#            player_hit = False
-#            invader_bullets.popleft()
+    # If an invader bullet hits the player, lose 1 life
+    for ib in list(invader_bullets):
+        if ib.rect.colliderect(player.rect) and not player_hit:
+            player_hit = True        
+            player_lives -= 1
+
+            # reset player position
+            player.x = (SCREEN_WIDTH / 2) - (35 / 2)
+            player.update() 
+            Player_last_hit_time = pygame.time.get_ticks()
+            invader_bullets.remove(ib)
+
+    if player_hit and current_time > Player_last_hit_time + player_i_frames:
+        player_hit = False
+
 
     if player_lives <= 0:
-        player_Xchange = 0
-        print("Game Over")
-    
+            player_Xchange = 0
+            game_over_surface = font.render("Game Over", True, (255, 0, 0))
+            screen.blit(game_over_surface, (SCREEN_WIDTH//2 - 50, SCREEN_HEIGHT//2))
+        
 
     pygame.display.flip()
 
