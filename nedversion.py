@@ -1,3 +1,6 @@
+# ------------------------- Things to do ------------------------- 
+# Add Restart - End screen should have clear (no player ship no invaders)
+
 import pygame
 import sys
 from collections import deque
@@ -41,11 +44,6 @@ player_hit = False
 player_lives = 3
 player_i_frames = 200
 Player_last_hit_time = 0
-current_wave = 1
-wave2_state = None
-wave2_direction = 1
-wave2_step_timer = 0
-
 
 # ------------------------- BULLET SETUP -------------------------
 
@@ -123,19 +121,32 @@ obstacles.append(Obstacle(340, 350))
                 
 # ------------------------- ENEMY SETUP -------------------------
 
+# Alien
 alien1_img = pygame.image.load("C:/Users/Amber/Downloads/space/alien1.png").convert_alpha()
 alien1 = pygame.transform.scale(alien1_img, (32, 32))
-
 # Flash Red
 alien1_red = alien1.copy()
 alien1_red.fill((255, 0, 0), special_flags=pygame.BLEND_MULT)
 
+# Alien 2
 alien2_img = pygame.image.load("C:/Users/Amber/Downloads/space/alien2.png").convert_alpha()
 alien2 = pygame.transform.scale(alien2_img, (32, 32))
-
-# Flash Red for alien2
+# Flash Red 
 alien2_red = alien2.copy()
 alien2_red.fill((255, 0, 0), special_flags=pygame.BLEND_MULT)
+
+# Alien 3
+alien3_img = pygame.image.load("C:/Users/Amber/Downloads/space/alien3.png").convert_alpha()
+alien3 = pygame.transform.scale(alien3_img, (48, 48))  # boss a bit bigger
+# Flash Red 
+alien3_red = alien3.copy()
+alien3_red.fill((255, 0, 0), special_flags=pygame.BLEND_MULT)
+
+current_wave = 1
+wave2_state = None
+wave2_direction = 1
+wave2_step_timer = 0
+wave3_speed = 1.0
 
 
 
@@ -238,8 +249,8 @@ def spawn_wave_2():
     global invaders, invader_direction, wave2_state, wave2_step_timer, wave2_direction, invader_speed
 
     invaders = []
-    cols = 4
-    rows = 3
+    cols = 1
+    rows = 1
 
     x_margin = 80
     y_margin = 40
@@ -261,6 +272,17 @@ def spawn_wave_2():
 
     invader_speed = 30
 
+def spawn_wave_3():
+    global invaders, current_wave
+
+    invaders = []
+
+    alien_w = alien3.get_width()
+    boss_x = SCREEN_WIDTH // 2 - alien_w // 2
+    boss_y = 40  # near the top
+
+    invaders.append(Invader(boss_x, boss_y, alien3, health=20, flash_img=alien3_red))
+    current_wave = 3
 
 
 # ------------------------- GAME LOOP -------------------------
@@ -401,7 +423,7 @@ while running:
             last_invader_shot_time = current_time
 
 
-    # Wave 1 Move Row
+    # ---- Wave 1 Movement ----
     if current_wave == 1 and current_time - last_row_move_time > row_move_delay and invader_rows:
         moving_row = invader_rows[current_row]
 
@@ -425,7 +447,7 @@ while running:
         current_row = (current_row + 1) % len(invader_rows)
         last_row_move_time = current_time
 
-    # ---- Wave 2 ----
+    # ---- Wave 2 Movement ----
     if current_wave == 2:
         now = current_time
         wave2_delay = 200  
@@ -455,6 +477,38 @@ while running:
                 for inv in invaders:
                     inv.y -= 10
                 wave2_state = "down"
+    
+    # ---- Wave 3 Movement ----
+    if current_wave == 3 and invaders:
+        final_invader = invaders[0]  
+
+        final_invader.y += wave3_speed
+
+        # Stop going below the barriers
+        remaining_barriers = [obs for obs in obstacles if len(obs.blocks_group) > 0]
+
+        if remaining_barriers:
+            # top of the barriers = smallest block.y from any remaining barrier
+            barrier_top = min(
+                block.rect.top
+                for obs in remaining_barriers
+                for block in obs.blocks_group
+            )
+
+            if final_invader.y + final_invader.img.get_height() >= barrier_top:
+                final_invader.y = barrier_top - final_invader.img.get_height()
+                # remove ONE whole barrier
+                obs_to_remove = remaining_barriers[0]
+                obstacles.remove(obs_to_remove)
+
+                # reset alien back to the top
+                final_invader.y = 40
+        else:
+            # no barriers left = Loose
+            bottom_limit = SCREEN_HEIGHT - 50
+            if final_invader.y + final_invader.img.get_height() >= bottom_limit:
+                final_invader.y = bottom_limit - final_invader.img.get_height()
+
 
 
     # ---- Draw ----
@@ -477,6 +531,9 @@ while running:
     if current_wave == 1 and len(invaders) == 0:
         current_wave = 2
         spawn_wave_2()
+
+    elif current_wave == 2 and len(invaders) == 0:
+        spawn_wave_3()
 
     pygame.display.flip()
 
