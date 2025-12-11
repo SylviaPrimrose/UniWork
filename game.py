@@ -248,8 +248,8 @@ class InvaderBullet:
 
 # Grid
 invaders = []
-cols = 1
-rows = 1
+cols = 5
+rows = 4
 
 alien_width = alien1_frames[0].get_width()
 alien_height = alien1_frames[0].get_height()
@@ -303,8 +303,8 @@ def spawn_wave_2():
     global invaders, invader_direction, wave2_state, wave2_step_timer, wave2_direction, invader_speed
 
     invaders = []
-    cols = 1
-    rows = 1 
+    cols = 5
+    rows = 4 
 
     x_margin = 80
     y_margin = 40
