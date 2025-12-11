@@ -41,6 +41,11 @@ player_hit = False
 player_lives = 3
 player_i_frames = 200
 Player_last_hit_time = 0
+current_wave = 1
+wave2_state = None
+wave2_direction = 1
+wave2_step_timer = 0
+
 
 # ------------------------- BULLET SETUP -------------------------
 
@@ -79,10 +84,6 @@ def fire_bullet():
         5, 5                           # width, height
     )
     bullets.append(new_bullet)
-
-# Hit boxes
-player.rect = pygame.Rect(player.x, player.y, player.l, player.h)
-player_hitbox = player.rect
 
 # -------------------- BARRIER SYSTEM --------------------
 
@@ -129,6 +130,14 @@ alien1 = pygame.transform.scale(alien1_img, (32, 32))
 alien1_red = alien1.copy()
 alien1_red.fill((255, 0, 0), special_flags=pygame.BLEND_MULT)
 
+alien2_img = pygame.image.load("C:/Users/Amber/Downloads/space/alien2.png").convert_alpha()
+alien2 = pygame.transform.scale(alien2_img, (32, 32))
+
+# Flash Red for alien2
+alien2_red = alien2.copy()
+alien2_red.fill((255, 0, 0), special_flags=pygame.BLEND_MULT)
+
+
 
 class Invader:
     def __init__(self, x, y, img, health=2, flash_img=None):
@@ -156,11 +165,21 @@ class Invader:
                 self.flash_hit_time = -1
 
 class InvaderBullet:
-    def __init__(self, x, y, l, h):
+    def __init__(self, x, y, l, h, double_damage=False, color=None):
         self.x = x
         self.y = y
         self.l = l
         self.h = h
+
+        self.double_damage = double_damage
+
+        if color is None:
+            if double_damage:
+                color = (255, 255, 255)    # white
+            else:
+                color = (255, 0, 0)        # red
+
+        self.color = color
         self.rect = pygame.Rect(self.x, self.y, self.l, self.h)
 
     def update(self):
@@ -168,10 +187,11 @@ class InvaderBullet:
         self.rect.topleft = (self.x, self.y)
 
 
+
 # Grid
 invaders = []
-cols = 6
-rows = 6
+cols = 1
+rows = 1
 
 alien_width = alien1.get_width()
 alien_height = alien1.get_height()
@@ -214,6 +234,33 @@ invader_shot_cooldown = 800
 last_invader_shot_time = 0
 
 
+def spawn_wave_2():
+    global invaders, invader_direction, wave2_state, wave2_step_timer, wave2_direction, invader_speed
+
+    invaders = []
+    cols = 4
+    rows = 3
+
+    x_margin = 80
+    y_margin = 40
+    wave2_state = "down"
+    wave2_direction = 1
+    wave2_step_timer = pygame.time.get_ticks()
+    invader_speed = 30
+
+    for r in range(rows):
+        for c in range(cols):
+            x = x_margin + c * (alien_width + 20)
+            y = y_margin + r * (alien_height + 20)
+            invaders.append(Invader(x, y, alien2, health=4, flash_img=alien2_red))
+
+
+    wave2_state = "down"  # down → side → up → repeat
+    wave2_direction = 1   # 1 right, -1 left
+    wave2_step_timer = pygame.time.get_ticks()
+
+    invader_speed = 30
+
 
 
 # ------------------------- GAME LOOP -------------------------
@@ -251,6 +298,8 @@ while running:
                 player_Xchange = 0
     # updating player position while input keys are held down
     player.x += player_Xchange
+    player.update()
+
 
     # ---- LIVES ----
     # setting the background colour to black
@@ -305,8 +354,55 @@ while running:
 
 
     # ------------------------- ENEMY AI -------------------------
-    # Move Row
-    if current_time - last_row_move_time > row_move_delay and invader_rows:
+
+    # ---- random invader shooting ----
+    if invaders and current_time > last_invader_shot_time + invader_shot_cooldown:
+        if random.random() < 0.2:  # 30% to shoot
+            shooter = random.choice(invaders)
+            new_ib = InvaderBullet(
+                shooter.x + alien_width // 2 - 2,
+                shooter.y + alien_height,
+                4,
+                10
+            )
+            invader_bullets.append(new_ib)
+            last_invader_shot_time = current_time
+
+
+    for bullet in list(invader_bullets):
+        bullet.update()
+        if bullet.y > SCREEN_HEIGHT:
+            invader_bullets.remove(bullet)
+            
+    if current_wave == 2 and invaders:
+        if current_time > last_invader_shot_time + 500: 
+            shooter = random.choice(invaders)
+
+            if random.random() < 0.30:
+                # big white double bullet
+                new_bullet = InvaderBullet(
+                    shooter.x + alien_width // 2 - 2,
+                    shooter.y + alien_height,
+                    6, 14,
+                    double_damage=True,
+                    color=(255, 255, 255)
+                )
+            else:
+                # normal red bullet
+                new_bullet = InvaderBullet(
+                    shooter.x + alien_width // 2 - 2,
+                    shooter.y + alien_height,
+                    4, 10,
+                    double_damage=False,
+                    color=(255, 0, 0)
+                )
+
+            invader_bullets.append(new_bullet)
+            last_invader_shot_time = current_time
+
+
+    # Wave 1 Move Row
+    if current_wave == 1 and current_time - last_row_move_time > row_move_delay and invader_rows:
         moving_row = invader_rows[current_row]
 
         # Move that row sideways
@@ -326,27 +422,39 @@ while running:
                 for inv in row:
                     inv.y += invader_move_down
 
-
         current_row = (current_row + 1) % len(invader_rows)
         last_row_move_time = current_time
 
-    # ---- random invader shooting ----
-    if invaders and current_time > last_invader_shot_time + invader_shot_cooldown:
-        if random.random() < 0.3:  # 30% to shoot
-            shooter = random.choice(invaders)
-            new_ib = InvaderBullet(
-                shooter.x + alien_width // 2 - 2,
-                shooter.y + alien_height,
-                4,
-                10
-            )
-            invader_bullets.append(new_ib)
-            last_invader_shot_time = current_time
+    # ---- Wave 2 ----
+    if current_wave == 2:
+        now = current_time
+        wave2_delay = 200  
 
-    for bullet in list(invader_bullets):
-        bullet.update()
-        if bullet.y > SCREEN_HEIGHT:
-            invader_bullets.remove(bullet)
+        if now - wave2_step_timer > wave2_delay and invaders:
+            wave2_step_timer = now
+
+            if wave2_state == "down":
+                for inv in invaders:
+                    inv.y += 10
+                wave2_state = "side"
+
+            elif wave2_state == "side":
+                hit_edge = False
+                for inv in invaders:
+                    inv.x += wave2_direction * invader_speed
+                    if inv.x <= 0 or inv.x + alien_width >= SCREEN_WIDTH:
+                        hit_edge = True
+
+                if hit_edge:
+                    wave2_direction *= -1
+                    for inv in invaders:
+                        inv.y += 20  # move down 2 instead of 1
+                wave2_state = "up"
+
+            elif wave2_state == "up":
+                for inv in invaders:
+                    inv.y -= 10
+                wave2_state = "down"
 
 
     # ---- Draw ----
@@ -362,7 +470,13 @@ while running:
 
     # Draw bullets 
     for bullet in invader_bullets:
-        pygame.draw.rect(screen, (255, 0, 0), bullet.rect)
+        pygame.draw.rect(screen, bullet.color, bullet.rect)
+
+    
+    # --- Wave Transition ---
+    if current_wave == 1 and len(invaders) == 0:
+        current_wave = 2
+        spawn_wave_2()
 
     pygame.display.flip()
 
@@ -411,5 +525,6 @@ while running:
         player.x = 16
     elif player.x >= 450:
         player.x = 450
+    
 
 sys.exit(0)
